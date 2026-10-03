@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LivePoll</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{--bg1:#2a1b7a;--bg2:#0b0d24;--card:rgba(255,255,255,.07);--line:rgba(255,255,255,.13);--txt:#f4f5ff;--mut:#a9aed6;
+--c0:#e21b3c;--c1:#1368ce;--c2:#d89e00;--c3:#26890c}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);
+background:radial-gradient(1200px 700px at 15% -10%,var(--bg1),var(--bg2)) fixed}
+.top{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;max-width:1100px;margin:0 auto}
+.brand{font-weight:800;font-size:1.25rem;letter-spacing:.3px}
+.pill{display:flex;align-items:center;gap:8px;padding:6px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.85rem}
+.pill i{width:9px;height:9px;border-radius:50%;background:#f5a524}
+.pill.on i{background:#2ee59d;box-shadow:0 0 9px #2ee59d}
+main{max-width:1100px;margin:0 auto;padding:0 16px 40px}
+.view{display:none}
+body[data-view=voter] #voter,body[data-view=screen] #screen,body[data-view=host] #host{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:24px;margin-bottom:16px;backdrop-filter:blur(8px)}
+h1.q{font-size:clamp(1.6rem,4.2vw,2.8rem);line-height:1.15;margin:.15em 0 .7em}
+h2,h3{margin:.2em 0 .6em}h3{font-size:.95rem;color:var(--mut);margin-top:1.2em}
+.grid{display:grid;gap:12px}
+.opt{display:flex;align-items:center;gap:14px;width:100%;padding:20px 18px;border:0;border-radius:16px;color:#fff;font-size:1.2rem;font-weight:700;text-align:left;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.3);transition:transform .08s}
+.opt:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.opt[disabled]{cursor:default;opacity:.4;box-shadow:none}
+.opt.mine{opacity:1;outline:3px solid #fff}
+.shape{font-size:1.5rem;width:1.7rem;text-align:center}
+.hint{color:var(--mut);text-align:center;min-height:1.4em;margin:.9em 0 0}
+.meta{display:flex;gap:12px;align-items:center;color:var(--mut);font-weight:600}
+.meta b{color:var(--txt);font-size:1.5rem}
+.tag{padding:3px 10px;border-radius:99px;font-size:.75rem;font-weight:800;background:#2ee59d;color:#05261a}
+.tag.closed{background:#ff6b6b;color:#2b0505}
+.bar{margin:14px 0}
+.lab{display:flex;justify-content:space-between;gap:12px;font-weight:700;font-size:1.1rem;margin-bottom:7px}
+.track{height:38px;background:rgba(255,255,255,.09);border-radius:11px;overflow:hidden}
+.fill{height:100%;width:0;border-radius:11px;transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.bar.win .lab{color:#ffd54a}.bar.win .track{outline:2px solid #ffd54a}
+.servers{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:20px;color:var(--mut);font-size:.9rem}
+.chip{padding:6px 12px;border-radius:12px;background:rgba(255,255,255,.1);color:var(--txt)}
+.chip b{margin-left:6px;color:#ffd54a}
+.screen-grid{display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start}
+.join{text-align:center}
+#qr{display:inline-block;background:#fff;padding:12px;border-radius:14px;min-height:50px}
+.url{margin-top:12px;font-weight:700;word-break:break-all}
+input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--txt);font-size:1rem;margin-bottom:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.btn{padding:12px 18px;border:0;border-radius:12px;background:#6c5ce7;color:#fff;font-weight:700;font-size:.95rem;cursor:pointer}
+.btn.warn{background:#e17055}.btn.ghost{background:rgba(255,255,255,.12);text-align:left}
+#presets{display:grid;gap:8px}
+a{color:#8fa2ff}
+@media(max-width:800px){.screen-grid{grid-template-columns:1fr}.two{grid-template-columns:1fr}}
+</style></head>
+<body data-view="voter">
+<header class="top">
+  <div class="brand">⚡ LivePoll</div>
+  <div class="pill" id="conn"><i></i><span>connecting…</span></div>
+</header>
+<main>
+  <section id="voter" class="view"><div class="card">
+    <h1 class="q">Waiting for the host…</h1>
+    <div id="vopts" class="grid"></div>
+    <p id="vmsg" class="hint"></p>
+  </div></section>
+
+  <section id="screen" class="view"><div class="screen-grid">
+    <div class="card">
+      <div class="meta"><b id="total">0</b> votes <span id="status" class="tag"></span></div>
+      <h1 class="q">Waiting for the host…</h1>
+      <div id="bars"></div>
+      <div id="servers" class="servers"></div>
+    </div>
+    <aside class="card join">
+      <h2>Join &amp; vote</h2>
+      <div id="qr"></div>
+      <div class="url" id="joinurl"></div>
+    </aside>
+  </div></section>
+
+  <section id="host" class="view">
+    <div class="card">
+      <h2>Host controls</h2>
+      <input id="hkey" type="password" placeholder="Host key">
+      <h3>Preloaded questions</h3><div id="presets"></div>
+      <h3>Or write your own</h3>
+      <input id="cq" placeholder="Your question">
+      <div class="two">
+        <input class="co" placeholder="Option 1"><input class="co" placeholder="Option 2">
+        <input class="co" placeholder="Option 3 (optional)"><input class="co" placeholder="Option 4 (optional)">
+      </div>
+      <div class="row">
+        <button class="btn" id="startc">Start my question</button>
+        <button class="btn warn" id="close">Close voting</button>
+        <button class="btn ghost" id="reset">Reset everything</button>
+      </div>
+      <p id="hmsg" class="hint"></p>
+    </div>
+    <div class="card">
+      <div class="meta"><b id="htotal">0</b> votes <span id="hstatus" class="tag"></span></div>
+      <h1 class="q">Waiting for the host…</h1>
+      <div id="hbars"></div>
+      <p class="hint">Projector view: <a href="/screen" target="_blank">/screen</a></p>
+    </div>
+  </section>
+</main>
+<script>
+const view=location.pathname.startsWith("/host")?"host":location.pathname.startsWith("/screen")?"screen":"voter";
+document.body.dataset.view=view;
+const $=id=>document.getElementById(id);
+const COLORS=["var(--c0)","var(--c1)","var(--c2)","var(--c3)"],SHAPES=["▲","◆","●","■"];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const cid=localStorage.cid||(localStorage.cid=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()));
+let snap=null,server="?",ws;
+
+function setConn(on){$("conn").classList.toggle("on",on);$("conn").lastElementChild.textContent=on?"Server "+server:"reconnecting…"}
+function connect(){
+  ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onclose=()=>{setConn(false);setTimeout(connect,1500)};
+  ws.onmessage=e=>{const m=JSON.parse(e.data);
+    if(m.type==="hello"){server=m.server;setConn(true)}
+    else if(m.type==="state"){snap=m;render()}
+    else if(m.type==="ack")onAck(m.result)};
+}
+
+function bars(el,s){
+  if(el.dataset.poll!==String(s.id)||el.children.length!==s.options.length){
+    el.dataset.poll=s.id;
+    el.innerHTML=s.options.map((o,i)=>`<div class="bar"><div class="lab"><span>${SHAPES[i]} ${esc(o)}</span><b>0</b></div><div class="track"><div class="fill" style="background:${COLORS[i]}"></div></div></div>`).join("");
+  }
+  const max=Math.max(0,...s.counts);
+  [...el.children].forEach((d,i)=>{const p=s.total?s.counts[i]/s.total*100:0;
+    d.querySelector(".fill").style.width=p+"%";
+    d.querySelector("b").textContent=s.counts[i]+" · "+Math.round(p)+"%";
+    d.classList.toggle("win",!s.open&&s.total>0&&s.counts[i]===max)});
+}
+function setStatus(el,s){el.textContent=s.id===0?"":s.open?"● LIVE":"CLOSED";el.classList.toggle("closed",!s.open)}
+
+function render(){
+  document.querySelectorAll(".q").forEach(e=>e.textContent=snap.question);
+  if(view==="voter")renderVoter();
+  if(view==="screen"){
+    $("total").textContent=snap.total;setStatus($("status"),snap);bars($("bars"),snap);
+    const ent=Object.entries(snap.servers).sort();
+    $("servers").innerHTML=ent.length?"Votes handled by: "+ent.map(([k,v])=>`<span class="chip">Server ${esc(k)}<b>${v}</b></span>`).join(""):"";
+  }
+  if(view==="host"){$("htotal").textContent=snap.total;setStatus($("hstatus"),snap);bars($("hbars"),snap)}
+}
+
+function renderVoter(){
+  const box=$("vopts"),mine=localStorage["v"+snap.id];
+  if(box.dataset.poll!==String(snap.id)){
+    box.dataset.poll=snap.id;
+    box.innerHTML=snap.options.map((o,i)=>`<button class="opt" style="background:${COLORS[i]}" data-i="${i}"><span class="shape">${SHAPES[i]}</span>${esc(o)}</button>`).join("");
+    box.onclick=e=>{const b=e.target.closest(".opt");if(b&&!b.disabled)vote(+b.dataset.i)};
+  }
+  const locked=mine!==undefined||!snap.open;
+  box.querySelectorAll(".opt").forEach((b,i)=>{b.disabled=locked;b.classList.toggle("mine",mine===String(i))});
+  $("vmsg").textContent=snap.id===0?"Waiting for the host to start a question…":mine!==undefined?"Vote locked in! Watch the screen 👀":!snap.open?"Voting is closed":"Tap an answer";
+}
+function vote(i){
+  localStorage["v"+snap.id]=i;
+  ws.send(JSON.stringify({type:"vote",client:cid,option:i}));renderVoter();
+}
+function onAck(r){
+  if(["closed","no_poll","bad_option","bad_client"].includes(r)&&snap){delete localStorage["v"+snap.id];renderVoter();
+    $("vmsg").textContent=r==="closed"?"Voting just closed":"Vote not accepted"}
+}
+
+if(view==="screen"){
+  const u=location.origin+"/join";$("joinurl").textContent=u.replace(/^https?:\/\//,"");
+  if(window.QRCode)new QRCode($("qr"),{text:u,width:200,height:200,colorDark:"#0b0d24",colorLight:"#ffffff"});
+}
+
+if(view==="host"){
+  const api=async(path,body)=>{
+    const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Host-Key":$("hkey").value},body:body?JSON.stringify(body):undefined});
+    $("hmsg").textContent=r.ok?"Done ✓":r.status===401?"Wrong host key":"Error "+r.status;return r.ok};
+  $("hkey").value=localStorage.hkey||"";$("hkey").oninput=()=>localStorage.hkey=$("hkey").value;
+  fetch("/api/questions").then(r=>r.json()).then(qs=>{
+    $("presets").innerHTML=qs.map((q,i)=>`<button class="btn ghost" data-i="${i}">${i+1}. ${esc(q.question)}</button>`).join("");
+    $("presets").onclick=e=>{const b=e.target.closest("button");if(b)api("/api/host/start",qs[+b.dataset.i])};
+  });
+  $("startc").onclick=()=>{
+    const options=[...document.querySelectorAll(".co")].map(i=>i.value.trim()).filter(Boolean),question=$("cq").value.trim();
+    if(!question||options.length<2){$("hmsg").textContent="Enter a question and at least 2 options";return}
+    api("/api/host/start",{question,options})};
+  $("close").onclick=()=>api("/api/host/close");
+  $("reset").onclick=()=>confirm("Clear the current question and votes?")&&api("/api/host/reset");
+}
+connect();
+</script></body></html>

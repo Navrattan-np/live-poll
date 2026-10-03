@@ -1,0 +1,20 @@
+# Local cluster: Redis + two poll servers (A on :8001, B on :8002).
+services:
+  redis:
+    image: redis:7-alpine
+  server-a:
+    build: .
+    environment: &env
+      REDIS_URL: redis://redis:6379
+      HOST_KEY: host
+      PEERS: http://localhost:8001,http://localhost:8002
+      INSTANCE_NAME: A
+    ports: ["8001:8000"]
+    depends_on: [redis]
+  server-b:
+    build: .
+    environment:
+      <<: *env
+      INSTANCE_NAME: B
+    ports: ["8002:8000"]
+    depends_on: [redis]

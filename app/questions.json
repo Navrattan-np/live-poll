@@ -1,0 +1,8 @@
+[
+  {"question": "What would you add to scale this app next?",
+   "options": ["Autoscaling", "HTTPS + custom domain", "A database", "Rate limiting"]},
+  {"question": "Which message broker would you pick for production?",
+   "options": ["Kafka", "RabbitMQ", "Redis Streams", "AWS SQS"]},
+  {"question": "How well can you explain load balancing now?",
+   "options": ["Like a pro", "Pretty well", "Need a refresher", "What is it?"]}
+]

@@ -1,0 +1,52 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -v
+
+  cluster-test:
+    # Real distributed check: 2 containers + Redis; vote on B, read on A.
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t live-poll .
+      - name: Start Redis and two servers
+        run: |
+          docker run -d --name redis -p 6379:6379 redis:7-alpine
+          for X in "A 8001" "B 8002"; do set -- $X
+            docker run -d --network host -e PORT=$2 -e INSTANCE_NAME=$1 \
+              -e REDIS_URL=redis://localhost:6379 live-poll
+          done
+          for P in 8001 8002; do
+            for i in $(seq 1 30); do curl -sf localhost:$P/health && break; sleep 1; done
+          done
+      - name: Vote on server B, read result from server A
+        run: |
+          curl -sf -X POST localhost:8001/api/host/start -H 'X-Host-Key: host' \
+            -H 'Content-Type: application/json' -d '{"question":"Q?","options":["a","b"]}'
+          curl -sf -X POST localhost:8002/api/vote -H 'Content-Type: application/json' \
+            -d '{"client":"ci-user","option":0}'
+          curl -sf localhost:8001/api/state | tee /dev/stderr | grep -q '"total":1'
+
+  deploy:
+    needs: [test, cluster-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploys (server A and B)
+        run: |
+          curl -sf -X POST "${{ secrets.RENDER_HOOK_A }}"
+          curl -sf -X POST "${{ secrets.RENDER_HOOK_B }}"

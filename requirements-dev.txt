@@ -1,0 +1,4 @@
+-r requirements.txt
+fakeredis==2.24.1
+httpx==0.27.2
+pytest==8.3.2
