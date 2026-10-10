@@ -45,8 +45,22 @@ jobs:
     needs: [test, cluster-test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC login to Azure, no client secrets
+      contents: read
     steps:
-      - name: Trigger Render deploys (server A and B)
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Build image in ACR (cloud build, no local Docker)
+        run: az acr build --registry "${{ vars.ACR_NAME }}" --image "livepoll:${{ github.sha }}" .
+      - name: Roll out to servers A and B
         run: |
-          curl -sf -X POST "${{ secrets.RENDER_HOOK_A }}"
-          curl -sf -X POST "${{ secrets.RENDER_HOOK_B }}"
+          IMAGE="${{ vars.ACR_NAME }}.azurecr.io/livepoll:${{ github.sha }}"
+          for APP in "${{ vars.APP_A }}" "${{ vars.APP_B }}"; do
+            az containerapp update --resource-group "${{ vars.RESOURCE_GROUP }}" \
+              --name "$APP" --container poll --image "$IMAGE" --output none
+          done
